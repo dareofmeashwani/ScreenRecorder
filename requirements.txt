@@ -1,0 +1,7 @@
+pystray
+pillow
+scipy
+sounddevice
+mss
+numpy
+opencv-python
