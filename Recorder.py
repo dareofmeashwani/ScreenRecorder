@@ -11,6 +11,7 @@ import base64
 from io import BytesIO
 from images import base64image
 from screen_recorder import ScreenRecorder
+import platform
 
 class TaskbarApp:
     def __init__(self):
@@ -20,7 +21,13 @@ class TaskbarApp:
         self.window = tk.Tk()
         self.window.title("Taskbar Application")
         self.window.geometry("350x350")
-
+        system_name = platform.system()
+        if system_name == "Windows":
+            self.window.wm_attributes('-toolwindow', True)
+        elif system_name == "Darwin":
+            pass
+        elif system_name == "Linux":
+            self.window.wm_attributes('-type', 'dock')
         # Set the window icon
         try:
             img_bytes = base64.b64decode(base64image)
