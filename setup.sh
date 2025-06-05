@@ -4,5 +4,5 @@ source venv/bin/activate
 pip3 install -r requirements-dev.txt
 pip3 install -r requirements.txt
 brew install python-tk
-#brew install ffmpeg
-#brew install loopback
+brew install ffmpeg
+brew install loopback

@@ -21,6 +21,8 @@ class TaskbarApp:
         self.window = tk.Tk()
         self.window.title("Taskbar Application")
         self.window.geometry("350x350")
+        style = ttk.Style()
+        style.configure("Faded.TButton", parent="TButton", background="#D0D0D0", foreground="#A0A0A0")
         system_name = platform.system()
         if system_name == "Windows":
             self.window.wm_attributes('-toolwindow', True)
@@ -78,7 +80,41 @@ class TaskbarApp:
         self.is_quitting = False
 
         self.window.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
+        self.window.bind("<Unmap>", self.on_unmap)
+        self.window.bind("<Map>", self.on_map)
         self.window.withdraw()
+
+    def toggle_fade_by_color(self, button, state):
+        if state:
+            button.config(style="Faded.TButton")
+        else:
+            button.config(style="TButton")
+
+    def on_unmap(self, event):
+        """
+        Handles the window being unmapped (minimized, maximized, or hidden).
+        """
+        if self.window.wm_state() == 'iconic':
+            # This means the window is minimized to the taskbar.
+            # We want to hide it to the tray instead.
+            self.hide_to_tray()
+        elif self.window.wm_state() == 'normal':
+            # This case might be triggered by maximizing to full screen,
+            # then restoring to normal from the title bar.
+            # The 'show_window' method will ensure it's visible and not in tray.
+            self.show_window()
+        # For maximizing, the state will typically change to 'zoomed' on Windows,
+        # or still 'normal' but filling the screen. The <Map> event usually
+        # handles bringing it back to the foreground if it was hidden.
+
+    def on_map(self, event):
+        """
+        Handles the window being mapped (shown).
+        """
+        # When the window is mapped, ensure it's visible and not in the tray.
+        # This handles maximization from the taskbar icon or other means.
+        if self.icon and self.icon.visible:
+            self.show_window()
 
     def _start_handler(self):
         """Handles the start button click, preventing multiple starts."""
@@ -95,6 +131,7 @@ class TaskbarApp:
         if self._is_running or self._recorder is not None and self._recorder.is_alive():
             return  # Prevent starting if already running or still stopping
         self.start_button.state(["disabled"])
+        self.toggle_fade_by_color(self.start_button, True)
         self._is_running = True
         self.label.config(text="Application starting...")
         print("Start button clicked. Application starting.")
@@ -106,6 +143,7 @@ class TaskbarApp:
         os.makedirs(path, exist_ok=True)
         self._recorder.start(os.path.join(path, file_name))
         self.stop_button.state(["!disabled"])
+        self.toggle_fade_by_color(self.stop_button, False)
         self.label.config(text="Application started...")
 
     def stop(self):
@@ -113,6 +151,7 @@ class TaskbarApp:
         if not self._is_running or self._recorder is None or not self._recorder.is_alive():
             return  # Prevent stopping if not running or thread not active
         self.stop_button.state(["disabled"])
+        self.toggle_fade_by_color(self.stop_button, True)
         self._is_running = False
         self.label.config(text="Stopping application...")
         self._recorder.stop()
@@ -120,6 +159,7 @@ class TaskbarApp:
         self.stop_event.set()
         self.window.after(100, self._check_thread_status)
         self.start_button.state(["!disabled"])
+        self.toggle_fade_by_color(self.start_button, False)
 
     def _check_thread_status(self):
         """Checks if the background thread has finished."""
