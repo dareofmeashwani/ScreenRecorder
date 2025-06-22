@@ -13,6 +13,7 @@ from images import base64image
 from screen_recorder import ScreenRecorder
 import platform
 
+
 class TaskbarApp:
     def __init__(self):
         """
@@ -22,20 +23,21 @@ class TaskbarApp:
         self.window.title("Taskbar Application")
         self.window.geometry("350x350")
         style = ttk.Style()
-        style.configure("Faded.TButton", parent="TButton", background="#D0D0D0", foreground="#A0A0A0")
+        style.configure(
+            "Faded.TButton",
+            parent="TButton",
+            background="#D0D0D0",
+            foreground="#A0A0A0",
+        )
         system_name = platform.system()
-        if system_name == "Windows":
-            self.window.wm_attributes('-toolwindow', True)
-        elif system_name == "Darwin":
-            pass
-        elif system_name == "Linux":
-            self.window.wm_attributes('-type', 'dock')
         # Set the window icon
         try:
             img_bytes = base64.b64decode(base64image)
             img = Image.open(BytesIO(img_bytes))
             buffer = BytesIO()
-            img.save(buffer, format="png")  # You can choose other formats if Tkinter supports them
+            img.save(
+                buffer, format="png"
+            )  # You can choose other formats if Tkinter supports them
             buffer.seek(0)
             icon_img = tk.PhotoImage(data=buffer.read())  # Use a .png file
             self.window.iconphoto(True, icon_img)
@@ -46,14 +48,18 @@ class TaskbarApp:
         self.label = ttk.Label(self.window, text="Application is running...")
         self.label.pack(pady=20)
 
-        self.start_button = ttk.Button(self.window, text="Start", command=self._start_handler)
+        self.start_button = ttk.Button(
+            self.window, text="Start", command=self._start_handler
+        )
         self.start_button.pack(pady=5)
-        self.stop_button = ttk.Button(self.window, text="Stop", command=self._stop_handler)
+        self.stop_button = ttk.Button(
+            self.window, text="Stop", command=self._stop_handler
+        )
         self.stop_button.pack(pady=5)
         self.stop_button.state(["disabled"])
         self.quit_button = ttk.Button(self.window, text="Quit", command=self.quit_app)
         self.quit_button.pack(pady=5)
-        
+
         input_frame = ttk.Frame(self.window, padding="5 5 5 5")
         input_frame.pack(pady=20)
         input_frame.columnconfigure(0, weight=1)
@@ -61,7 +67,9 @@ class TaskbarApp:
         name_label = ttk.Label(input_frame, text="Path")
         name_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         self.path_location = ttk.Entry(input_frame, width=30)
-        self.path_location.insert(0, os.path.join(os.path.expanduser('~'),"Recordings"))
+        self.path_location.insert(
+            0, os.path.join(os.path.expanduser("~"), "Recordings")
+        )
         self.path_location.grid(row=0, column=1, padx=5, pady=5, sticky=(tk.W, tk.E))
 
         try:
@@ -69,11 +77,12 @@ class TaskbarApp:
             self.icon_image = Image.open(BytesIO(img_bytes))
         except FileNotFoundError:
             print("Error: icon.png not found. Using a placeholder.")
-            self.icon_image = Image.new('RGBA', (64, 64), color=(0, 0, 0, 0))
+            self.icon_image = Image.new("RGBA", (64, 64), color=(0, 0, 0, 0))
 
         self.icon = None
         self._is_running = False  # Use a private variable
-        self._recorder = None     # Use a private variable
+        self._recorder = None  # Use a private variable
+        self._background_work = []
         self.stop_event = threading.Event()
         self.thread_exception = None
         self.main_thread_id = threading.get_ident()
@@ -94,25 +103,12 @@ class TaskbarApp:
         """
         Handles the window being unmapped (minimized, maximized, or hidden).
         """
-        if self.window.wm_state() == 'iconic':
-            # This means the window is minimized to the taskbar.
-            # We want to hide it to the tray instead.
+        if self.window.wm_state() == "iconic":
             self.hide_to_tray()
-        elif self.window.wm_state() == 'normal':
-            # This case might be triggered by maximizing to full screen,
-            # then restoring to normal from the title bar.
-            # The 'show_window' method will ensure it's visible and not in tray.
+        elif self.window.wm_state() == "normal":
             self.show_window()
-        # For maximizing, the state will typically change to 'zoomed' on Windows,
-        # or still 'normal' but filling the screen. The <Map> event usually
-        # handles bringing it back to the foreground if it was hidden.
 
     def on_map(self, event):
-        """
-        Handles the window being mapped (shown).
-        """
-        # When the window is mapped, ensure it's visible and not in the tray.
-        # This handles maximization from the taskbar icon or other means.
         if self.icon and self.icon.visible:
             self.show_window()
 
@@ -138,7 +134,13 @@ class TaskbarApp:
         self.stop_event.clear()
         self.thread_exception = None
         self._recorder = ScreenRecorder()
-        file_name = str(datetime.datetime.now()).replace(":", "_").replace(".", "_").replace(" ", "_")+".mp4"
+        file_name = (
+            str(datetime.datetime.now())
+            .replace(":", "_")
+            .replace(".", "_")
+            .replace(" ", "_")
+            + ".mp4"
+        )
         path = self.path_location.get()
         os.makedirs(path, exist_ok=True)
         self._recorder.start(os.path.join(path, file_name))
@@ -148,7 +150,11 @@ class TaskbarApp:
 
     def stop(self):
         """Stops the background thread."""
-        if not self._is_running or self._recorder is None or not self._recorder.is_alive():
+        if (
+            not self._is_running
+            or self._recorder is None
+            or not self._recorder.is_alive()
+        ):
             return  # Prevent stopping if not running or thread not active
         self.stop_button.state(["disabled"])
         self.toggle_fade_by_color(self.stop_button, True)
@@ -175,29 +181,38 @@ class TaskbarApp:
 
     def show_window(self):
         """Shows the main window."""
+
         def _show_window():
             if self.is_quitting:
                 return
             self.window.deiconify()
             if self.icon:
                 self.icon.visible = False
+
         if threading.get_ident() != self.main_thread_id:
-             self.window.after(0, _show_window)
+            self.window.after(0, _show_window)
         else:
-             _show_window()
+            _show_window()
 
     def hide_to_tray(self):
         """Hides the main window and minimizes to the system tray."""
+
         def _hide_to_tray():
             if self.is_quitting:
                 return
             self.window.withdraw()
             if self.icon is None:
                 self.buttons = {
-                    "Show" : pystray.MenuItem("Show", self.show_window, default=True),
-                    "Start": pystray.MenuItem("Start", self._start_handler, enabled=lambda x: not self._is_running),
-                    "Stop": pystray.MenuItem("Stop", self._stop_handler, enabled=lambda x: self._is_running),
-                    "Quit": pystray.MenuItem("Quit", self.quit_app)
+                    "Show": pystray.MenuItem("Show", self.show_window, default=True),
+                    "Start": pystray.MenuItem(
+                        "Start",
+                        self._start_handler,
+                        enabled=lambda x: not self._is_running,
+                    ),
+                    "Stop": pystray.MenuItem(
+                        "Stop", self._stop_handler, enabled=lambda x: self._is_running
+                    ),
+                    "Quit": pystray.MenuItem("Quit", self.quit_app),
                 }
                 self.icon = pystray.Icon(
                     "TaskbarApp",
@@ -207,7 +222,7 @@ class TaskbarApp:
                         self.buttons["Show"],
                         self.buttons["Start"],
                         self.buttons["Stop"],
-                        self.buttons["Quit"]
+                        self.buttons["Quit"],
                     ),
                 )
                 try:
@@ -265,6 +280,7 @@ class TaskbarApp:
         """Runs the application."""
         self.hide_to_tray()
         self.window.mainloop()
+
 
 if __name__ == "__main__":
     app = TaskbarApp()
