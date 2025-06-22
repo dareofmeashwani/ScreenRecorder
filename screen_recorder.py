@@ -8,6 +8,7 @@ import time
 import os
 import threading
 import platform  # Import platform module
+import random
 
 
 class ScreenRecorder:
@@ -41,9 +42,9 @@ class ScreenRecorder:
         self._mic_stream = None
         self._mic_frames = []
         self._threads = []
-        self._cleanup_temp_files()
+        self.random_number = str(random.randint(1, 10000000))
 
-    def _cleanup_temp_files(self):
+    def cleanup_temp_files(self):
         """Removes temporary video and audio files."""
         directory = self.current_dir
 
@@ -249,7 +250,8 @@ class ScreenRecorder:
                     kwargs={
                         "monitor": monitors[index],
                         "filename": os.path.join(
-                            self.current_dir, "temp_video_{0}.avi".format(index)
+                            self.current_dir,
+                            "temp_video_{0}-{1}.avi".format(index, self.random_number),
                         ),
                     },
                 )
@@ -293,6 +295,10 @@ class ScreenRecorder:
             return None
 
     def stop(self):
+        self.close_thread = threading.Thread(target=self._close, daemon=True)
+        self.close_thread.start()
+
+    def _close(self):
         """
         Stops the screen and audio recording, saves temporary files,
         and merges them into a final video file using ffmpeg.
@@ -310,7 +316,9 @@ class ScreenRecorder:
         for v_writer in self._video_writer:
             v_writer.release()
 
-        temp_mic_audio_file = os.path.join(self.current_dir, "temp_mic_audio.wav")
+        temp_mic_audio_file = os.path.join(
+            self.current_dir, "temp_mic_audio-" + self.random_number + ".wav"
+        )
 
         if self._mic_frames:
             recorded_audio = np.concatenate(self._mic_frames, axis=0)
@@ -323,7 +331,7 @@ class ScreenRecorder:
         filename, file_extension = os.path.splitext(self.final_output_file)
         for v_index in range(len(self._video_writer)):
             temp_video_file = os.path.join(
-                self.current_dir, "temp_video_{0}.avi".format(v_index)
+                self.current_dir, "temp_video_{0}-{1}.avi".format(v_index, self.random_number)
             )
             if os.path.exists(temp_video_file) and os.path.exists(temp_mic_audio_file):
                 outfile = filename + "_{0}".format(v_index) + file_extension
@@ -390,9 +398,12 @@ class ScreenRecorder:
         self._threads = []
         self._video_writer = []
         self._mic_stream = None
+        self.close_thread = None
 
     def is_alive(self):
         for thread in self._threads:
             if thread.is_alive():
                 return True
+        if self.close_thread and self.close_thread.is_alive():
+            return True
         return False

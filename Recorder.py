@@ -92,6 +92,7 @@ class TaskbarApp:
         self.window.bind("<Unmap>", self.on_unmap)
         self.window.bind("<Map>", self.on_map)
         self.window.withdraw()
+        ScreenRecorder().cleanup_temp_files()
 
     def toggle_fade_by_color(self, button, state):
         if state:
@@ -147,6 +148,7 @@ class TaskbarApp:
         self.stop_button.state(["!disabled"])
         self.toggle_fade_by_color(self.stop_button, False)
         self.label.config(text="Application started...")
+        self._background_work = [item for item in self._background_work if item.is_alive()]
 
     def stop(self):
         """Stops the background thread."""
@@ -161,18 +163,24 @@ class TaskbarApp:
         self._is_running = False
         self.label.config(text="Stopping application...")
         self._recorder.stop()
+        self._background_work.append(self._recorder)
         print("Stop button clicked. Requesting application stop.")
         self.stop_event.set()
-        self.window.after(100, self._check_thread_status)
+        # self.window.after(100, self._check_thread_status)
         self.start_button.state(["!disabled"])
         self.toggle_fade_by_color(self.start_button, False)
+        self._recorder = None
 
     def _check_thread_status(self):
         """Checks if the background thread has finished."""
-        if self._recorder and self._recorder.is_alive():
-            self.window.after(100, self._check_thread_status)
+        if (
+            self._recorder
+            and self._recorder.is_alive()
+            or self._background_work
+            and any(work.is_alive() for work in self._background_work)
+        ):
+            self.window.after(500, self._check_thread_status)
         else:
-            self._recorder = None
             self.label.config(text="Application stopped.")
             print("Background task stopped.")
             if self.thread_exception:
@@ -244,7 +252,11 @@ class TaskbarApp:
             return
         self.is_quitting = True
         print("Quit requested")
+
         self.stop()
+        for work in self._background_work:
+            work.is_alive() and work.close_thread.join()
+        self.window.after(100, self._check_thread_status)
 
         def _cleanup():
             if self.icon:
@@ -254,7 +266,6 @@ class TaskbarApp:
                     print(f"Error stopping icon: {e}")
                     traceback.print_exc()
             self.cleanup_and_destroy()
-
         if self.icon:
             if threading.get_ident() != self.main_thread_id:
                 self.window.after(0, _cleanup)
